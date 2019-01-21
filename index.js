@@ -2,12 +2,13 @@ const { ApolloServer, gql } = require('apollo-server');
 
 const typeDefs = gql`
    type Query {
-      message: String
+      message(name: String): String
       user: User!
    }
    type User {
       id: ID!
       username: String!
+      firstLetterOfUserName: String!
    }
    type Error {
       field: String!
@@ -24,20 +25,32 @@ const typeDefs = gql`
    }
    type Mutation {
       register(userInfo: UserInfo!): RegisterResponse!
-      login(userInfo: UserInfo!): Boolean!
+      login(userInfo: UserInfo!): String!
    }
 `;
 
 const resolvers = {
+   User: {
+      firstLetterOfUserName: parent => {
+         return parent.username[0];
+      },
+      username: parent => {
+         return parent.username;
+      }
+   },
    Query: {
-      message: () => null,
+      message: (parent, { name }) => {
+         return `Heyy ${name}`;
+      },
       user: () => ({
          id: 2,
          username: 'Fırat'
       })
    },
    Mutation: {
-      login: () => true,
+      login: (parent, { userInfo: { username } }, context) => {
+         return username;
+      },
       register: () => ({
          errors: [
             {
@@ -59,7 +72,8 @@ const resolvers = {
 
 const server = new ApolloServer({
    typeDefs,
-   resolvers
+   resolvers,
+   context: ({ req, res }) => ({ req, res })
 });
 
 server.listen().then(({ url }) => {
