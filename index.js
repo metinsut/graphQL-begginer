@@ -1,4 +1,4 @@
-const { ApolloServer, gql } = require('apollo-server');
+const { ApolloServer, gql, PubSub } = require('apollo-server');
 
 const typeDefs = gql`
    type Query {
@@ -27,9 +27,19 @@ const typeDefs = gql`
       register(userInfo: UserInfo!): RegisterResponse!
       login(userInfo: UserInfo!): String!
    }
+   type Subscription {
+      newUser: User!
+   }
 `;
 
+const NEW_USER = "NEW_USER";
+
 const resolvers = {
+   Subscription: {
+      newUser: {
+         subscribe: (_, __, { pubSub }) => pubSub.asyncIterator(NEW_USER)
+      }
+   },
    User: {
       firstLetterOfUserName: parent => {
          return parent.username[0];
@@ -51,29 +61,37 @@ const resolvers = {
       login: (parent, { userInfo: { username } }, context) => {
          return username;
       },
-      register: () => ({
-         errors: [
-            {
-               field: 'username',
-               message: 'bad'
-            },
-            {
-               field: 'username2',
-               message: 'bad2'
-            }
-         ],
-         user: {
+      register: (_, { username }, { pubSub }) => {
+         const user = {
             id: 1,
-            username: 'John'
+            username
          }
-      })
+         pubSub.publish(NEW_USER, {
+            newUser: user
+         });
+         return {
+            errors: [
+               {
+                  field: 'username',
+                  message: 'bad'
+               },
+               {
+                  field: 'username2',
+                  message: 'bad2'
+               }
+            ],
+            user
+         }
+      }
    }
 };
+
+const pubSub = new PubSub();
 
 const server = new ApolloServer({
    typeDefs,
    resolvers,
-   context: ({ req, res }) => ({ req, res })
+   context: ({ req, res }) => ({ req, res, pubSub })
 });
 
 server.listen().then(({ url }) => {
